@@ -1189,10 +1189,13 @@ function loadNotifProfile() {
 }
 
 function saveNotifProfile(updates) {
-  if (!STORE.uid) return;
+  if (!STORE.uid) { console.error('saveNotifProfile: no uid'); return; }
   _np = Object.assign({}, _np || {}, updates);
   _npNotify();
-  sb.from('profiles').upsert(Object.assign({ user_id: STORE.uid }, _np));
+  sb.from('profiles').upsert(Object.assign({ user_id: STORE.uid }, _np)).then(function(res) {
+    if (res.error) { console.error('profiles upsert error:', res.error); }
+    else { console.log('profiles saved ok', _np); }
+  });
 }
 
 function useNotifToggle(group) {
