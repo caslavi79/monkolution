@@ -1190,7 +1190,7 @@ async function saveNotifProfile(updates) {
 }
 
 function useNotifToggle(group) {
-  var [, setRef] = useState(0);
+  var _r = useState(0); var setRef = _r[1];
   useEffect(function() {
     var fn = function() { setRef(function(n){ return n+1; }); };
     _notifListeners.push(fn);
@@ -1216,7 +1216,8 @@ function getNS() { return {}; }
 function saveNS() {}
 function initGroupDefaults() {}
 
-function BellButton({ enabled, onClick }) {
+function BellButton(props) {
+  var enabled = props.enabled, onClick = props.onClick;
   return /*#__PURE__*/React.createElement("button", {
     onClick: onClick,
     title: enabled ? "Email notifications on" : "Email notifications off",
@@ -1231,7 +1232,7 @@ function BellButton({ enabled, onClick }) {
 }
 
 function NotifSettingsSection() {
-  var [, setRef] = useState(0);
+  var _r = useState(0); var setRef = _r[1];
   useEffect(function() {
     var fn = function() { setRef(function(n){ return n+1; }); };
     _notifListeners.push(fn);
@@ -1253,7 +1254,8 @@ function NotifSettingsSection() {
   var toggleStyle = function(on) { return { width:44, height:26, borderRadius:13, background: on ? "#0A84FF" : "rgba(255,255,255,0.15)", border:"none", cursor:"pointer", position:"relative", transition:"background 0.2s", flexShrink:0 }; };
   var knobStyle = function(on) { return { position:"absolute", top:3, left: on ? 21 : 3, width:20, height:20, borderRadius:10, background:"#fff", transition:"left 0.2s" }; };
 
-  function Toggle({ on, onToggle }) {
+  function Toggle(tprops) {
+    var on = tprops.on, onToggle = tprops.onToggle;
     return /*#__PURE__*/React.createElement("button", { onClick: onToggle, style: toggleStyle(on) },
       /*#__PURE__*/React.createElement("div", { style: knobStyle(on) })
     );
