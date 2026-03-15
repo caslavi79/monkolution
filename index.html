@@ -130,8 +130,8 @@ var { BarChart, Bar, LineChart, Line, AreaChart, Area, XAxis, YAxis, Tooltip, Re
 // ═══════════════════════════════════════
 // SUPABASE CONFIG — replace these two values
 // ═══════════════════════════════════════
-var SUPABASE_URL      = 'YOUR_SUPABASE_URL';
-var SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
+var SUPABASE_URL      = 'https://wfachecmvgcisfuuxbmo.supabase.co';
+var SUPABASE_ANON_KEY = 'sb_publishable_lZeI9uTC7fbQoIEUEXnbjQ_p3-6hDzj';
 var sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // ═══════════════════════════════════════
@@ -1171,37 +1171,38 @@ function markGuideSeen(id) {
 }
 
 // ── Notifications ──
-var _notifProfile = null;
-var _notifListeners = [];
-function _notifyListeners() { _notifListeners.forEach(function(fn){ fn(); }); }
+var _np = null;
+var _npCbs = [];
+function _npNotify() { _npCbs.forEach(function(f){ f(); }); }
 
-async function loadNotifProfile() {
+function loadNotifProfile() {
   if (!STORE.uid) return;
-  var { data } = await sb.from('profiles').select('*').eq('user_id', STORE.uid).single();
-  _notifProfile = data || { habits_enabled: false, habits_hour: 9, tasks_enabled: false, tasks_hour: 9 };
-  _notifyListeners();
+  sb.from('profiles').select('*').eq('user_id', STORE.uid).single().then(function(res) {
+    _np = res.data || { habits_enabled: false, habits_hour: 9, tasks_enabled: false, tasks_hour: 9 };
+    _npNotify();
+  });
 }
 
-async function saveNotifProfile(updates) {
+function saveNotifProfile(updates) {
   if (!STORE.uid) return;
-  _notifProfile = Object.assign({}, _notifProfile || {}, updates);
-  _notifyListeners();
-  await sb.from('profiles').upsert(Object.assign({ user_id: STORE.uid }, _notifProfile));
+  _np = Object.assign({}, _np || {}, updates);
+  _npNotify();
+  sb.from('profiles').upsert(Object.assign({ user_id: STORE.uid }, _np));
 }
 
 function useNotifToggle(group) {
-  var _r = useState(0); var setRef = _r[1];
+  var rs = useState(0); var setRef = rs[1];
   useEffect(function() {
     var fn = function() { setRef(function(n){ return n+1; }); };
-    _notifListeners.push(fn);
-    if (!_notifProfile) loadNotifProfile();
-    return function() { _notifListeners = _notifListeners.filter(function(f){ return f !== fn; }); };
+    _npCbs.push(fn);
+    if (!_np) loadNotifProfile();
+    return function() { _npCbs = _npCbs.filter(function(f){ return f !== fn; }); };
   }, []);
-  var enabled = _notifProfile ? !!_notifProfile[group + '_enabled'] : false;
+  var enabled = _np ? !!_np[group + '_enabled'] : false;
   function toggle() {
-    var updates = {};
-    updates[group + '_enabled'] = !enabled;
-    saveNotifProfile(updates);
+    var u = {};
+    u[group + '_enabled'] = !enabled;
+    saveNotifProfile(u);
   }
   return [enabled, toggle, false, function(){}];
 }
@@ -1215,10 +1216,12 @@ function setMaster() {}
 function getNS() { return {}; }
 function saveNS() {}
 function initGroupDefaults() {}
+async function checkRealPermission() { return false; }
 
 function BellButton(props) {
-  var enabled = props.enabled, onClick = props.onClick;
-  return /*#__PURE__*/React.createElement("button", {
+  var enabled = props.enabled;
+  var onClick = props.onClick;
+  return React.createElement("button", {
     onClick: onClick,
     title: enabled ? "Email notifications on" : "Email notifications off",
     style: {
@@ -1232,74 +1235,71 @@ function BellButton(props) {
 }
 
 function NotifSettingsSection() {
-  var _r = useState(0); var setRef = _r[1];
+  var rs = useState(0); var setRef = rs[1];
   useEffect(function() {
     var fn = function() { setRef(function(n){ return n+1; }); };
-    _notifListeners.push(fn);
-    if (!_notifProfile) loadNotifProfile();
-    return function() { _notifListeners = _notifListeners.filter(function(f){ return f !== fn; }); };
+    _npCbs.push(fn);
+    if (!_np) loadNotifProfile();
+    return function() { _npCbs = _npCbs.filter(function(f){ return f !== fn; }); };
   }, []);
 
-  var p = _notifProfile || { habits_enabled: false, habits_hour: 9, tasks_enabled: false, tasks_hour: 9 };
+  var p = _np || { habits_enabled: false, habits_hour: 9, tasks_enabled: false, tasks_hour: 9 };
 
-  function hourToLabel(h) {
-    var ampm = h < 12 ? "AM" : "PM";
+  function hourLabel(h) {
+    var ap = h < 12 ? "AM" : "PM";
     var h12 = h % 12 || 12;
-    return h12 + ":00 " + ampm;
+    return h12 + ":00 " + ap;
   }
 
-  var rowStyle = { display:"flex", alignItems:"center", justifyContent:"space-between", padding:"14px 0", borderBottom:"1px solid rgba(255,255,255,0.06)" };
-  var labelStyle = { fontSize:15, color:"#f5f5f7", fontWeight:500 };
-  var subStyle = { fontSize:12, color:"rgba(255,255,255,0.35)", marginTop:2 };
-  var toggleStyle = function(on) { return { width:44, height:26, borderRadius:13, background: on ? "#0A84FF" : "rgba(255,255,255,0.15)", border:"none", cursor:"pointer", position:"relative", transition:"background 0.2s", flexShrink:0 }; };
-  var knobStyle = function(on) { return { position:"absolute", top:3, left: on ? 21 : 3, width:20, height:20, borderRadius:10, background:"#fff", transition:"left 0.2s" }; };
+  var card = { background: "rgba(255,255,255,0.04)", borderRadius: 16, padding: "0 16px", marginTop: 8 };
+  var row = { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 0", borderBottom: "1px solid rgba(255,255,255,0.06)" };
+  var rowLast = { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 0" };
 
-  function Toggle(tprops) {
-    var on = tprops.on, onToggle = tprops.onToggle;
-    return /*#__PURE__*/React.createElement("button", { onClick: onToggle, style: toggleStyle(on) },
-      /*#__PURE__*/React.createElement("div", { style: knobStyle(on) })
+  function Toggle(tp) {
+    var on = tp.on;
+    var onToggle = tp.onToggle;
+    return React.createElement("button", {
+      onClick: onToggle,
+      style: { width: 44, height: 26, borderRadius: 13, background: on ? "#0A84FF" : "rgba(255,255,255,0.15)", border: "none", cursor: "pointer", position: "relative", transition: "background 0.2s", flexShrink: 0 }
+    }, React.createElement("div", {
+      style: { position: "absolute", top: 3, left: on ? 21 : 3, width: 20, height: 20, borderRadius: 10, background: "#fff", transition: "left 0.2s" }
+    }));
+  }
+
+  function TimeSelect(tsp) {
+    var val = tsp.val;
+    var onChange = tsp.onChange;
+    return React.createElement("div", { style: { padding: "0 0 14px" } },
+      React.createElement("div", { style: { fontSize: 12, color: "rgba(255,255,255,0.4)", marginBottom: 8 } }, "Send time"),
+      React.createElement("select", {
+        value: val,
+        onChange: function(e) { onChange(parseInt(e.target.value)); },
+        style: { background: "rgba(255,255,255,0.08)", border: "none", borderRadius: 10, padding: "8px 12px", color: "#f5f5f7", fontFamily: "inherit", fontSize: 14 }
+      }, Array.from({ length: 24 }, function(_, i) {
+        return React.createElement("option", { key: i, value: i }, hourLabel(i));
+      }))
     );
   }
 
-  return /*#__PURE__*/React.createElement("div", { style:{ margin:"24px 0" } },
-    /*#__PURE__*/React.createElement("div", { style:{ fontSize:13, fontWeight:700, color:"rgba(255,255,255,0.3)", textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:8 } }, "📧 Email Notifications"),
-    /*#__PURE__*/React.createElement("div", { style:{ background:"rgba(255,255,255,0.04)", borderRadius:16, padding:"0 16px" } },
-
-      /*#__PURE__*/React.createElement("div", { style: rowStyle },
-        /*#__PURE__*/React.createElement("div", null,
-          /*#__PURE__*/React.createElement("div", { style: labelStyle }, "🏃 Habits reminder"),
-          /*#__PURE__*/React.createElement("div", { style: subStyle }, p.habits_enabled ? ("Sends daily at " + hourToLabel(p.habits_hour)) : "Off")
+  return React.createElement("div", { style: { margin: "24px 0" } },
+    React.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 } }, "📧 Email Notifications"),
+    React.createElement("div", { style: card },
+      React.createElement("div", { style: row },
+        React.createElement("div", null,
+          React.createElement("div", { style: { fontSize: 15, color: "#f5f5f7", fontWeight: 500 } }, "🏃 Habits reminder"),
+          React.createElement("div", { style: { fontSize: 12, color: "rgba(255,255,255,0.35)", marginTop: 2 } }, p.habits_enabled ? ("Sends daily at " + hourLabel(p.habits_hour)) : "Off")
         ),
-        /*#__PURE__*/React.createElement(Toggle, { on: p.habits_enabled, onToggle: function(){ saveNotifProfile({ habits_enabled: !p.habits_enabled }); } })
+        React.createElement(Toggle, { on: p.habits_enabled, onToggle: function() { saveNotifProfile({ habits_enabled: !p.habits_enabled }); } })
       ),
-      p.habits_enabled && /*#__PURE__*/React.createElement("div", { style:{ padding:"0 0 14px" } },
-        /*#__PURE__*/React.createElement("div", { style:{ fontSize:12, color:"rgba(255,255,255,0.4)", marginBottom:8 } }, "Send time"),
-        /*#__PURE__*/React.createElement("select", {
-          value: p.habits_hour,
-          onChange: function(e){ saveNotifProfile({ habits_hour: parseInt(e.target.value) }); },
-          style:{ background:"rgba(255,255,255,0.08)", border:"none", borderRadius:10, padding:"8px 12px", color:"#f5f5f7", fontFamily:"inherit", fontSize:14 }
-        }, Array.from({length:24}, function(_, i){
-          return /*#__PURE__*/React.createElement("option", { key:i, value:i }, hourToLabel(i));
-        }))
-      ),
-
-      /*#__PURE__*/React.createElement("div", { style: Object.assign({}, rowStyle, { borderBottom:"none" }) },
-        /*#__PURE__*/React.createElement("div", null,
-          /*#__PURE__*/React.createElement("div", { style: labelStyle }, "✅ Tasks reminder"),
-          /*#__PURE__*/React.createElement("div", { style: subStyle }, p.tasks_enabled ? ("Sends daily at " + hourToLabel(p.tasks_hour)) : "Off")
+      p.habits_enabled && React.createElement(TimeSelect, { val: p.habits_hour, onChange: function(v) { saveNotifProfile({ habits_hour: v }); } }),
+      React.createElement("div", { style: rowLast },
+        React.createElement("div", null,
+          React.createElement("div", { style: { fontSize: 15, color: "#f5f5f7", fontWeight: 500 } }, "✅ Tasks reminder"),
+          React.createElement("div", { style: { fontSize: 12, color: "rgba(255,255,255,0.35)", marginTop: 2 } }, p.tasks_enabled ? ("Sends daily at " + hourLabel(p.tasks_hour)) : "Off")
         ),
-        /*#__PURE__*/React.createElement(Toggle, { on: p.tasks_enabled, onToggle: function(){ saveNotifProfile({ tasks_enabled: !p.tasks_enabled }); } })
+        React.createElement(Toggle, { on: p.tasks_enabled, onToggle: function() { saveNotifProfile({ tasks_enabled: !p.tasks_enabled }); } })
       ),
-      p.tasks_enabled && /*#__PURE__*/React.createElement("div", { style:{ padding:"0 0 14px" } },
-        /*#__PURE__*/React.createElement("div", { style:{ fontSize:12, color:"rgba(255,255,255,0.4)", marginBottom:8 } }, "Send time"),
-        /*#__PURE__*/React.createElement("select", {
-          value: p.tasks_hour,
-          onChange: function(e){ saveNotifProfile({ tasks_hour: parseInt(e.target.value) }); },
-          style:{ background:"rgba(255,255,255,0.08)", border:"none", borderRadius:10, padding:"8px 12px", color:"#f5f5f7", fontFamily:"inherit", fontSize:14 }
-        }, Array.from({length:24}, function(_, i){
-          return /*#__PURE__*/React.createElement("option", { key:i, value:i }, hourToLabel(i));
-        }))
-      )
+      p.tasks_enabled && React.createElement(TimeSelect, { val: p.tasks_hour, onChange: function(v) { saveNotifProfile({ tasks_hour: v }); } })
     )
   );
 }
@@ -8802,11 +8802,17 @@ function LoginScreen({ onLogin }) {
       if (password.length < 6) { setErr("Password must be at least 6 characters."); return; }
       if (password !== confirm) { setErr("Passwords do not match."); return; }
       setLoading(true);
-      var { error } = await sb.auth.signUp({ email: email.trim().toLowerCase(), password });
+      var { data: signUpData, error } = await sb.auth.signUp({ email: email.trim().toLowerCase(), password });
       setLoading(false);
       if (error) { setErr(error.message); return; }
-      setErr("Account created! Check your email to confirm, then log in.\n(Or disable email confirmation in Supabase → Auth settings.)");
-      setMode("login");
+      if (signUpData && signUpData.user) {
+        STORE.uid = signUpData.user.id;
+        await loadAll();
+        onLogin(signUpData.user.email);
+      } else {
+        setErr("Account created! Please log in.");
+        setMode("login");
+      }
     } else {
       setLoading(true);
       var { data, error } = await sb.auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
@@ -8814,7 +8820,7 @@ function LoginScreen({ onLogin }) {
       if (error) { setErr(error.message); return; }
       STORE.uid = data.user.id;
       await loadAll();
-      await loadNotifProfile();
+      loadNotifProfile();
       onLogin(data.user.email);
     }
   }
