@@ -1177,8 +1177,13 @@ function _npNotify() { _npCbs.forEach(function(f){ f(); }); }
 
 function loadNotifProfile() {
   if (!STORE.uid) return;
+  var tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
   sb.from('profiles').select('*').eq('user_id', STORE.uid).single().then(function(res) {
-    _np = res.data || { habits_enabled: false, habits_hour: 9, tasks_enabled: false, tasks_hour: 9 };
+    _np = res.data || { habits_enabled: false, habits_hour: 9, tasks_enabled: false, tasks_hour: 9, notif_tz: tz };
+    if (!_np.notif_tz || _np.notif_tz !== tz) {
+      _np.notif_tz = tz;
+      sb.from('profiles').upsert(Object.assign({ user_id: STORE.uid }, _np));
+    }
     _npNotify();
   });
 }
@@ -1321,6 +1326,7 @@ function NotifSettingsSection() {
 
   return React.createElement("div", { style: { margin: "24px 0" } },
     React.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 } }, "📧 Email Notifications"),
+    React.createElement("div", { style: { fontSize: 12, color: "rgba(255,255,255,0.35)", marginBottom: 10 } }, "🌍 Timezone: " + (p.notif_tz || 'detecting...')),
     React.createElement("div", { style: card },
       React.createElement("div", { style: row },
         React.createElement("div", null,
